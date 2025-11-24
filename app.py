@@ -459,11 +459,11 @@ if not st.session_state.user_logged_in:
         st.session_state.user_logged_in = True
         st.rerun()
 
-# Document Upload & Analysis Section (works with or without login)
+# Document Upload & Analysis Section (AT THE VERY TOP - works with or without login)
 if 'show_doc_analysis' not in st.session_state:
     st.session_state.show_doc_analysis = False
 
-# Show document analysis if button was clicked
+# Show document analysis if button was clicked - APPEARS FIRST
 if st.session_state.show_doc_analysis:
     st.markdown("---")
     
@@ -570,6 +570,10 @@ Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}
                                 )
     
     st.markdown("---")
+    # After document analysis, show login prompt if not logged in
+    if not st.session_state.user_logged_in:
+        st.info("💬 **Want to chat with the legal assistant?** Enter your name above to start chatting!")
+
 
 # Chat section (only shows after login)
 if st.session_state.user_logged_in:
