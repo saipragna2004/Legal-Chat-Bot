@@ -1,0 +1,12 @@
+streamlit
+openai
+pandas
+reportlab
+pyttsx3
+SpeechRecognition
+requests
+deep-translator
+gTTS
+pygame
+google-generativeai
+pyaudio
