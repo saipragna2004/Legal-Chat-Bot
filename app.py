@@ -420,15 +420,21 @@ st.markdown("""
         .stButton>button {
             border: 2px solid #4CAF50;
             border-radius: 8px;
-            color: white;
-            padding: 5px 7px;
-            font-size: 6px;
-            margin: 10px;
+            background-color: #4CAF50;
+            color: #FFFFFF;
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 5px;
             cursor: pointer;
+            transition: all 0.3s ease;
         }
 
         .stButton>button:hover {
-            background-color: white;
+            background-color: #45a049;
+            color: #FFFFFF;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
     </style>
 """, unsafe_allow_html=True)        
@@ -436,16 +442,22 @@ st.markdown("""
 # Create 3 columns for the buttons
 col1, col2, col3 = st.columns(3)
 
-# Speech to Text Button
+# Speech to Text Button (disabled on cloud)
 with col1:
-    if st.button(translations[st.session_state.language_preference]["voice_query"]):
-        query = listen()
-        if query:
-            st.session_state.messages.append(query)
-            st.write(f"Your Query: {query}")
-            response, _ = get_response(query)  # Unpack tuple, ignore is_ai flag for voice
-            st.write(f"Assistant Response: {response}")
-            speak(response)  # Speak the response
+    # Check if running on Streamlit Cloud (no microphone access)
+    is_cloud = os.getenv('STREAMLIT_SHARING_MODE') or not engine
+    
+    if is_cloud:
+        st.button(translations[st.session_state.language_preference]["voice_query"], disabled=True, help="Voice features are not available on cloud deployment")
+    else:
+        if st.button(translations[st.session_state.language_preference]["voice_query"]):
+            query = listen()
+            if query:
+                st.session_state.messages.append(query)
+                st.write(f"Your Query: {query}")
+                response, _ = get_response(query)  # Unpack tuple, ignore is_ai flag for voice
+                st.write(f"Assistant Response: {response}")
+                speak(response)  # Speak the response
 
 # Interaction History Button
 with col2:
