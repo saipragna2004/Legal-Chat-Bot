@@ -146,7 +146,8 @@ def get_response(query):
                     return response, True  # Return True to indicate AI response (for Read More button)
         except Exception as e:
             print(f"Gemini Error: {e}")
-            # Don't show error to user, fall back to keywords
+            # Show visible warning to user
+            st.warning(f"⚠️ AI Busy/Error: {str(e)[:50]}... Switching to basic manual mode.")
             pass
 
     # Check for matching patterns only if patterns exist
