@@ -126,22 +126,20 @@ def get_response(query):
             
             if api_key:
                 genai.configure(api_key=api_key)
-                # Use the Flash model for better rate limits
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                
-                # Create prompt for Medium Length (Balanced) with Strict Legal Guardrails
-                prompt = f"""You are a specialized legal assistant for Indian law. 
-                Your task is to answer ONLY legal-related queries.
-                
-                Query: {query}
-                
-                Instructions:
-                1. If the query is NOT related to law, crime, rights, or legal procedures, reply EXACTLY: "I am a legal assistant. I can only help you with legal matters, laws, and rights in India."
-                2. If the query IS legal, provide a clear, balanced answer (4-5 sentences).
-                3. Mention key sections/acts but avoid overwhelming detail.
-                4. Always remind users to consult a lawyer."""
-                
-                response_obj = model.generate_content(prompt)
+                # Use Gemini 2.0 Flash as primary
+                model_name = 'gemini-2.0-flash'
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    response_obj = model.generate_content(prompt)
+                except Exception as e:
+                    if "429" in str(e):
+                        # Fallback to Flash Lite if Rate Limited
+                        model_name = 'gemini-2.0-flash-lite'
+                        model = genai.GenerativeModel(model_name)
+                        response_obj = model.generate_content(prompt)
+                    else:
+                        raise e
+
                 response = response_obj.text.strip()
                 if response:
                     st.session_state.conversation_context.append(f"Assistant: {response}")
@@ -205,7 +203,8 @@ def analyze_legal_document(document_text, document_name):
             return "❌ API key not configured. Please set up GEMINI_API_KEY in secrets."
         
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Primary Model
+        model_name = 'gemini-2.0-flash'
         
         # Limit text length to avoid token limits (first 4000 characters)
         text_sample = document_text[:4000] if len(document_text) > 4000 else document_text
@@ -249,7 +248,16 @@ Provide a comprehensive legal analysis in the following format:
 **Important Disclaimer:** This is an AI-generated analysis for informational purposes only. This does NOT constitute legal advice. Please consult a qualified lawyer for professional legal advice specific to your situation.
 """
         
-        response = model.generate_content(prompt)
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+        except Exception as e:
+            if "429" in str(e):
+                 # Fallback to Flash Lite
+                model = genai.GenerativeModel('gemini-2.0-flash-lite')
+                response = model.generate_content(prompt)
+            else:
+                raise e
         return response.text
         
     except Exception as e:
