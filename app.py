@@ -127,7 +127,7 @@ def get_response(query):
             if api_key:
                 genai.configure(api_key=api_key)
                 # Use the Flash model for better rate limits
-                model = genai.GenerativeModel('gemini-2.0-flash')
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
                 # Create prompt for Medium Length (Balanced) with Strict Legal Guardrails
                 prompt = f"""You are a specialized legal assistant for Indian law. 
@@ -205,7 +205,7 @@ def analyze_legal_document(document_text, document_name):
             return "❌ API key not configured. Please set up GEMINI_API_KEY in secrets."
         
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         # Limit text length to avoid token limits (first 4000 characters)
         text_sample = document_text[:4000] if len(document_text) > 4000 else document_text
@@ -253,7 +253,10 @@ Provide a comprehensive legal analysis in the following format:
         return response.text
         
     except Exception as e:
-        return f"❌ Analysis error: {str(e)}\n\nPlease try again or consult the error logs."
+        error_msg = str(e)
+        if "429" in error_msg or "Quota exceeded" in error_msg:
+            return "⚠️ **Limit Reached**: The free AI service is busy right now. Please wait a minute and try again."
+        return f"❌ Analysis error: {error_msg}\n\nPlease try again or consult the error logs."
 
 
 # Language Translation Dictionary
