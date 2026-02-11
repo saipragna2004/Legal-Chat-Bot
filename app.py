@@ -172,6 +172,8 @@ def get_response(query):
         response = "Indian citizens have fundamental rights under the Constitution including right to equality, freedom, and justice."
     elif 'robbery' in query or 'theft' in query or 'dacoity' in query or 'roberry' in query:
         response = "Theft, Robbery, and Dacoity are offenses under the Indian Penal Code (Sections 378-402). Punishment varies based on severity. Report such incidents to the police immediately."
+    elif 'cheating' in query or 'fraud' in query:
+        response = "Cheating is defined under Section 415 of the IPC. Punishment for cheating is prescribed under Section 417 (up to 1 year imprisonment) and Section 420 (up to 7 years for cheating and dishonestly inducing delivery of property)."
     else:
         response = translations[st.session_state.language_preference]["no_response"]
     
