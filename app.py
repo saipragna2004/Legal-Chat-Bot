@@ -7,12 +7,12 @@ import pandas as pd
 import json
 import os
 
-# Try to import Google Generative AI
+# Try to import Cerebras AI
 try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
+    from cerebras.cloud.sdk import Cerebras
+    CEREBRAS_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
+    CEREBRAS_AVAILABLE = False
 
 # Import document processor
 try:
@@ -93,62 +93,63 @@ def load_patterns():
 
 patterns = load_patterns()
 
-# Define response function using Gemini API (Cloud Compatible)
+# Helper to load Cerebras API key from multiple sources
+def _get_cerebras_api_key():
+    api_key = None
+    # 1. Streamlit Secrets (primary)
+    if hasattr(st, 'secrets'):
+        api_key = st.secrets.get("CEREBRAS_API_KEY")
+    # 2. Environment variable
+    if not api_key:
+        api_key = os.getenv("CEREBRAS_API_KEY")
+    # 3. Direct file read (local fallback)
+    if not api_key:
+        try:
+            import toml
+            secrets = toml.load(".streamlit/secrets.toml")
+            api_key = secrets.get("CEREBRAS_API_KEY")
+        except:
+            pass
+    return api_key
+
+# Define response function using Cerebras AI
 def get_response(query):
     query = query.lower().strip()
     if len(query) < 3:
-        return translations[st.session_state.language_preference]["no_response"]
+        return translations[st.session_state.language_preference]["no_response"], False
 
     # Add the latest user query to the conversation context
     st.session_state.conversation_context.append(f"User: {query}")
 
-    # Try to use Gemini API
-    if GEMINI_AVAILABLE:
+    # Try to use Cerebras API
+    if CEREBRAS_AVAILABLE:
         try:
-            # Robust API Key Loading
-            api_key = None
-            # 1. Try Streamlit Secrets
-            if hasattr(st, 'secrets'):
-                api_key = st.secrets.get("GEMINI_API_KEY")
-            
-            # 2. Try Environment Variable
-            if not api_key:
-                api_key = os.getenv("GEMINI_API_KEY")
+            api_key = _get_cerebras_api_key()
 
-            # 3. Try Direct File Read (Local Fallback)
-            if not api_key:
-                try:
-                    import toml
-                    secrets = toml.load(".streamlit/secrets.toml")
-                    api_key = secrets.get("GEMINI_API_KEY")
-                except:
-                    pass
-            
             if api_key:
-                genai.configure(api_key=api_key)
-                # Use Gemini 2.0 Flash as primary
-                model_name = 'gemini-2.0-flash'
-                try:
-                    model = genai.GenerativeModel(model_name)
-                    response_obj = model.generate_content(prompt)
-                except Exception as e:
-                    if "429" in str(e):
-                        # Fallback to Flash Lite if Rate Limited
-                        model_name = 'gemini-2.0-flash-lite'
-                        model = genai.GenerativeModel(model_name)
-                        response_obj = model.generate_content(prompt)
-                    else:
-                        raise e
+                # Build a proper legal prompt from the user's query
+                context_text = "\n".join(st.session_state.conversation_context[-6:])
+                legal_prompt = f"""You are an expert Indian legal advisor chatbot. Answer the following legal question in a clear, helpful, and accurate manner. Focus on Indian laws including IPC, CrPC, Constitution of India, and other relevant legislation.
 
-                response = response_obj.text.strip()
+Conversation context:
+{context_text}
+
+User question: {query}
+
+Provide a specific, accurate legal response. Include relevant sections of law, punishments, and practical advice where applicable."""
+
+                client = Cerebras(api_key=api_key)
+                chat_completion = client.chat.completions.create(
+                    messages=[{"role": "user", "content": legal_prompt}],
+                    model="llama3.1-8b",
+                )
+                response = chat_completion.choices[0].message.content.strip()
                 if response:
                     st.session_state.conversation_context.append(f"Assistant: {response}")
-                    return response, True  # Return True to indicate AI response (for Read More button)
+                    return response, True  # True = AI response (enables Read More button)
         except Exception as e:
-            print(f"Gemini Error: {e}")
-            # Show visible warning to user
-            st.warning(f"⚠️ AI Busy/Error: {str(e)[:50]}... Switching to basic manual mode.")
-            pass
+            print(f"Cerebras Error: {e}")
+            st.warning(f"⚠️ AI Busy/Error: {str(e)[:60]}... Switching to basic mode.")
 
     # Check for matching patterns only if patterns exist
     if patterns and isinstance(patterns, list):
@@ -175,43 +176,27 @@ def get_response(query):
         response = "Cheating is defined under Section 415 of the IPC. Punishment for cheating is prescribed under Section 417 (up to 1 year imprisonment) and Section 420 (up to 7 years for cheating and dishonestly inducing delivery of property)."
     else:
         response = translations[st.session_state.language_preference]["no_response"]
-    
+
     st.session_state.conversation_context.append(f"Assistant: {response}")
     return response, False
 
 def analyze_legal_document(document_text, document_name):
-    """Analyze legal document using Gemini API"""
-    
-    if not GEMINI_AVAILABLE:
-        return "❌ AI analysis not available. Please ensure Gemini API is configured."
-    
+    """Analyze legal document using Cerebras AI"""
+
+    if not CEREBRAS_AVAILABLE:
+        return "❌ AI analysis not available. Please ensure the cerebras-cloud-sdk is installed."
+
     try:
-        # Get API key
-        api_key = None
-        if hasattr(st, 'secrets'):
-            api_key = st.secrets.get("GEMINI_API_KEY")
+        api_key = _get_cerebras_api_key()
+
         if not api_key:
-            api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            try:
-                import toml
-                secrets = toml.load(".streamlit/secrets.toml")
-                api_key = secrets.get("GEMINI_API_KEY")
-            except:
-                pass
-        
-        if not api_key:
-            return "❌ API key not configured. Please set up GEMINI_API_KEY in secrets."
-        
-        genai.configure(api_key=api_key)
-        # Primary Model
-        model_name = 'gemini-2.0-flash'
-        
+            return "❌ API key not configured. Please set up CEREBRAS_API_KEY in .streamlit/secrets.toml."
+
         # Limit text length to avoid token limits (first 4000 characters)
         text_sample = document_text[:4000] if len(document_text) > 4000 else document_text
-        
+
         # Create detailed analysis prompt
-        prompt = f"""You are an expert legal document analyst specializing in Indian law.
+        analysis_prompt = f"""You are an expert legal document analyst specializing in Indian law.
 
 Document Name: {document_name}
 Document Length: {len(document_text)} characters
@@ -246,25 +231,19 @@ Provide a comprehensive legal analysis in the following format:
 [Highlight the most important things the user must be aware of]
 
 ---
-**Important Disclaimer:** This is an AI-generated analysis for informational purposes only. This does NOT constitute legal advice. Please consult a qualified lawyer for professional legal advice specific to your situation.
-"""
-        
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-        except Exception as e:
-            if "429" in str(e):
-                 # Fallback to Flash Lite
-                model = genai.GenerativeModel('gemini-2.0-flash-lite')
-                response = model.generate_content(prompt)
-            else:
-                raise e
-        return response.text
-        
+**Important Disclaimer:** This is an AI-generated analysis for informational purposes only. This does NOT constitute legal advice. Please consult a qualified lawyer for professional legal advice specific to your situation."""
+
+        client = Cerebras(api_key=api_key)
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": analysis_prompt}],
+            model="llama3.1-8b",
+        )
+        return chat_completion.choices[0].message.content
+
     except Exception as e:
         error_msg = str(e)
-        if "429" in error_msg or "Quota exceeded" in error_msg:
-            return "⚠️ **Limit Reached**: The free AI service is busy right now. Please wait a minute and try again."
+        if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
+            return "⚠️ **Rate Limit Reached**: The AI service is busy. Please wait a moment and try again."
         return f"❌ Analysis error: {error_msg}\n\nPlease try again or consult the error logs."
 
 
@@ -617,20 +596,25 @@ if st.session_state.user_logged_in:
             with st.expander("📖 Read Detailed Explanation"):
                 with st.spinner("Generating detailed legal analysis..."):
                     try:
-                        # Re-use the configured model to generate a detailed response
-                        model = genai.GenerativeModel('gemini-2.0-flash')
-                        detailed_prompt = f"""You are an expert legal advisor.
-                        Provide a comprehensive, detailed legal analysis of: {prompt}
-                        Include:
-                        1. Relevant Sections/Acts (IPC, CrPC, etc.)
-                        2. Punishments/Fines
-                        3. Legal Procedure/Steps
-                        4. Rights of the involved parties
-                        5. Important Case Laws (if any)
-                        Format with clear headings and bullet points."""
-                        
-                        detailed_response = model.generate_content(detailed_prompt)
-                        st.markdown(detailed_response.text)
+                        api_key = _get_cerebras_api_key()
+                        if api_key and CEREBRAS_AVAILABLE:
+                            detailed_prompt = f"""You are an expert Indian legal advisor.
+Provide a comprehensive, detailed legal analysis of the following topic: {prompt}
+Include:
+1. Relevant Sections/Acts (IPC, CrPC, Constitution, etc.)
+2. Punishments/Fines
+3. Legal Procedure/Steps
+4. Rights of the involved parties
+5. Important Case Laws (if any)
+Format with clear headings and bullet points."""
+                            client = Cerebras(api_key=api_key)
+                            chat_completion = client.chat.completions.create(
+                                messages=[{"role": "user", "content": detailed_prompt}],
+                                model="llama3.1-8b",
+                            )
+                            st.markdown(chat_completion.choices[0].message.content)
+                        else:
+                            st.error("AI not available for detailed explanation.")
                     except Exception as e:
                         st.error("Could not generate detailed explanation.")
 
