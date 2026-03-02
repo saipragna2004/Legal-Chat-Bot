@@ -8,7 +8,7 @@ requests
 deep-translator
 gTTS
 pygame
-google-generativeai
+cerebras-cloud-sdk
 pyaudio
 PyPDF2
 python-docx
