@@ -34,4 +34,4 @@ If a match is found, the corresponding legal response is shown to the user.
 - Offers a user-friendly interface for asking legal questions. 🔗
 
 ## Contact
-For any inquiries or feedback, please contact [VINAY REDDY] at [kunduvinayredde@gmail.com].
+For any inquiries or feedback, please contact [Sai Pragna] at [saipragna2004@gmail.com].
